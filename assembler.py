@@ -3,7 +3,7 @@ import math
 import pkg_resources
 import numpy as np
 
-RES_LIB = pkg_resources.resource_filename('peptoid_tools', 'res_lib/')
+RES_LIB = pkg_resources.resource_filename('peptoid-tools', 'res_lib/')
 
 def vec_align(a, b):
     v = np.cross(a, b)
@@ -71,12 +71,23 @@ class PDBWriter:
         fileout.write(self.tail)
         builder.clear()
 
+class Packer:
+    def __init__(self, build):
+        self.build = build
+
+    def test(self):
+        copy = self.build.__copy__()
 
 class Builder:
     def __init__(self):
         self.chain = []
         self.orientation_up = True
         self.res_types = [f[:-4] for f in os.listdir(RES_LIB) if f[-4:] == '.pdb']
+
+    def __copy__(self):
+        new_builder = Builder()
+        for chain in self.chain:
+            print(chain)
 
     def chain_init(self, resname):
         res1 = PeptoidResidue(resname)
@@ -331,10 +342,6 @@ class CarbonResidue(Residue):
             new_pos[:,3] = hp3_pos
             self.positions = new_pos
             self.name = 'CCH'
-
-
-
-
 
 class PeptoidResidue(Residue):
     def __init__(self, name):
