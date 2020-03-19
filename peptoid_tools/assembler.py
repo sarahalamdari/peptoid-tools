@@ -6,7 +6,15 @@ import numpy as np
 RES_LIB = pkg_resources.resource_filename('peptoid-tools', 'res_lib/')
 
 def vec_align(a, b):
+    """
+    Align two vectors
+
+    Parameters
+    ----------
+
+    """
     v = np.cross(a, b)
+    print (v)
     s = np.linalg.norm(v)
     c = a.dot(b)
     I = np.identity(3)
