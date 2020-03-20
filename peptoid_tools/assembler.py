@@ -3,7 +3,7 @@ import math
 import pkg_resources
 import numpy as np
 
-RES_LIB = pkg_resources.resource_filename('peptoid_tools', 'res_lib/')
+RES_LIB = pkg_resources.resource_filename('peptoid-tools.peptoid_tools', 'res_lib')
 
 def vec_align(a, b):
     """
@@ -14,7 +14,6 @@ def vec_align(a, b):
 
     """
     v = np.cross(a, b)
-    print (v)
     s = np.linalg.norm(v)
     c = a.dot(b)
     I = np.identity(3)
@@ -31,6 +30,19 @@ def vec_align(a, b):
     R = I + v_skew + v_skew@v_skew*(1/(1+c))
     return R
 
+def get_rot_mat(axis, angle):
+    rot_mat = np.zeros((3,3))
+    rot_mat[0,0] = math.cos(angle)+axis[0]**2*(1-math.cos(angle))
+    rot_mat[1,0] = axis[0]*axis[1]*(1-math.cos(angle))+axis[2]*math.sin(angle)
+    rot_mat[2,0] = axis[0]*axis[2]*(1-math.cos(angle))-axis[1]*math.sin(angle)
+    rot_mat[0,1] = axis[0]*axis[1]*(1-math.cos(angle))-axis[2]*math.sin(angle)
+    rot_mat[1,1] = math.cos(angle)+axis[1]**2*(1-math.cos(angle))
+    rot_mat[2,1] = axis[1]*axis[2]*(1-math.cos(angle))+axis[0]*math.sin(angle)
+    rot_mat[0,2] = axis[0]*axis[2]*(1-math.cos(angle))+axis[1]*math.sin(angle)
+    rot_mat[1,2] = axis[1]*axis[2]*(1-math.cos(angle))-axis[0]*math.sin(angle)
+    rot_mat[2,2] = math.cos(angle)+axis[2]**2*(1-math.cos(angle))
+    return rot_mat
+
 class PDBWriter:
     def __init__(self):
         self.header = "CRYST1   40.000   40.000   40.000  90.00  90.00  90.00 P 1           1"+'\n'
@@ -40,51 +52,115 @@ class PDBWriter:
         line = f"ATOM{atomid:7d}  {atomtype:<3s}{resname:>4s}{resid:6d}{position[0]:12.3f}{position[1]:8.3f}{position[2]:8.3f}  1.00  0.00"+'\n'
         return line
 
-    def write_from_res(self, res, file):
+    def write_res(self, res, fo, atomid=1, resid=1, write_out=True):
         atoms = res.atoms
+        if write_out:
+            fo = open(fo, 'w')
+            fo.write(self.header)
         if '_' in res.name:
             resname = res.name.split('_')[0]
         else:
             resname = res.name
-        resid = 1
-        positions = res.positions
-        fileout = open(file, 'w')
-        fileout.write(self.header)
         for i, atom in enumerate(atoms):
-            id = i+1
+            id = i+atomid
             atomtype = atom
-            position = positions[:,i]
+            position = res.positions[:,i]
             line = self.write_line(id, atomtype, resname, resid, position)
-            fileout.write(line)
-        fileout.write(self.tail)
+            fo.write(line)
+        if write_out:
+            fo.write(self.tail)
 
-    def write_from_build(self, builder, file):
-        id = 0
-        fileout = open(file, 'w')
-        fileout.write(self.header)
+    def write_build(self, builder, fo, atomid=1, resid=1, write_out=True):
+        if write_out:
+            fo = open(fo, 'w')
+            fo.write(self.header)
         for i, res in enumerate(builder.chain):
-            atoms = res.atoms
-            if '_' in res.name:
-                resname = res.name.split('_')[0]
-            else:
-                resname = res.name
-            resid = i+1
-            positions = res.positions
-            for j, atom in enumerate(atoms):
-                id += 1
-                atomtype = atom
-                position = positions[:,j]
-                line = self.write_line(id, atomtype, resname, resid, position)
-                fileout.write(line)
-        fileout.write(self.tail)
-        builder.clear()
+            self.write_res(res, fo, atomid, resid=i+resid, write_out=False)
+            atomid += len(res.atoms)
+        if write_out:
+            fo.write(self.tail)
 
+    def write_pack(self, packer, fo, write_out=True):
+        atomid = 1
+        num_res = len(packer.build.chain)
+        if write_out:
+            fo = open(fo, 'w')
+            fo.write(self.header)
+        for i, oligomer in enumerate(packer.oligomers):
+            for j, res in enumerate(oligomer.chain):
+                resid = i*num_res+(j+1)
+                self.write_res(res, fo, atomid, resid=resid, write_out=False)
+                atomid += len(res.atoms)
+        if write_out:
+            fo.write(self.tail)
+
+class Packer:
+    def __init__(self, build):
+        self.build = build
+        self.oligomers = [build]
+
+    def make_new_copy(self, oligomer='default'):
+        if oligomer == 'default':
+            copy = self.build.__copy__()
+        else:
+            copy = oligomer.__copy__()
+        self.oligomers.append(copy)
+
+    def backbone_align(self, oligomer1, oligomer2, dim_ignore=None):
+        for res in oligomer1.chain:
+            if res.type == 'hydrophobic':
+                last_res = res
+        for i, atom in enumerate(last_res.atoms):
+            if atom == 'NL':
+                align_pos = last_res.positions[:,i]
+        first_res = oligomer2.chain[0]
+        for i, atom in enumerate(first_res.atoms):
+            if atom == 'NR':
+                move_pos = first_res.positions[:,i]
+        x_move = align_pos[0] - move_pos[0]
+        y_move = align_pos[1] - move_pos[1]
+        z_move = align_pos[2] - move_pos[2]
+        trltn = [x_move, y_move, z_move]
+        if dim_ignore != None:
+            trltn[dim_ignore] = 0
+        oligomer2.trans(trltn)
+
+    def x_gen(self, n_repeats, d=18, ring_type='parallel'):
+        for i in range(n_repeats):
+            self.make_new_copy(self.oligomers[i])
+            self.oligomers[-1].flip_x(np.pi)
+            if ring_type == 'parallel':
+                self.oligomers[-1].flip_z(np.pi)
+            self.oligomers[-1].trans([d,0,0])
+            self.backbone_align(self.oligomers[-2], self.oligomers[-1], dim_ignore=0)
+
+    def copy_in_dim(self, n_repeats, d, dim=1):
+        bulk_oligomers = [self.oligomers]
+        trltn = np.zeros((3))
+        trltn[dim] = d
+
+        for i in range(n_repeats):
+            new_oligomers = []
+            for oligomer in bulk_oligomers[-1]:
+                new_oligomers.append(oligomer.__copy__())
+            for oligomer in new_oligomers:
+                oligomer.trans(trltn)
+                self.oligomers.append(oligomer)
+            bulk_oligomers.append(new_oligomers)
 
 class Builder:
     def __init__(self):
         self.chain = []
         self.orientation_up = True
         self.res_types = [f[:-4] for f in os.listdir(RES_LIB) if f[-4:] == '.pdb']
+
+    def __copy__(self):
+        builder_copy = Builder()
+        for res in self.chain:
+            builder_copy.chain.append(res.__copy__())
+        builder_copy.orientation_up = self.orientation_up
+        builder_copy.res_types = self.res_types
+        return builder_copy
 
     def chain_init(self, resname):
         res1 = PeptoidResidue(resname)
@@ -93,15 +169,19 @@ class Builder:
 
     def carbon_chain_init(self):
         res1 = CarbonResidue('PCH')
+        res1.name = 'PCT'
         self.chain.append(res1)
 
     def repeat(self, n=1):
         repeat_count = 1
         res1 = self.chain[-1]
         res2 = res1.__copy__()
+        # Align on res axis
+        res1.get_backbone_vectors(inplace=True)
+        res2.get_backbone_vectors(inplace=True)
+        R = vec_align(res1.backbone_vectors[1], res2.backbone_vectors[1])
         res2.rotate(math.pi)
         self.align_nl(res1, res2)
-        res2.get_backbone_vectors(inplace=True)
 
         res2_begin = res1.positions[:,res1.atoms.index('CLP')] - res1.backbone_vectors[1]
         trltn = res2_begin - res2.positions[:,res2.atoms.index('CA')]
@@ -121,9 +201,42 @@ class Builder:
         elif idx1 == 1:
             type_to_add = restypes[0]
         res2 = PeptoidResidue(type_to_add)
-        if self.orientation_up == False:
-            res2.rotate(math.pi)
+
+        # Set origin
+        origin_trltn = -self.chain[0].positions[:,self.chain[0].atoms.index('CA')]
+        for res in self.chain:
+            res.translate(origin_trltn)
+        origin_trltn_res = -res2.positions[:,res2.atoms.index('CA')]
+        res2.translate(origin_trltn_res)
+
+        # Align on z-axis
+        v_chain = self.chain[0].positions[:,self.chain[0].atoms.index('CLP')] - self.chain[0].positions[:,self.chain[0].atoms.index('CA')]
+        v_chain = v_chain / np.linalg.norm(v_chain)
+
+        v_res = res2.positions[:,res2.atoms.index('CLP')] - res2.positions[:,res2.atoms.index('CA')]
+        v_res = v_res / np.linalg.norm(v_res)
+
+        a_chain = v_chain
+        a_res = v_res
+        b = np.array([0, 0, 1])
+        R_chain = vec_align(a_chain,b)
+        R_res = vec_align(a_res,b)
+        for res in self.chain:
+            new_pos = R_chain.dot(res.positions)
+            res.positions = new_pos
+        new_pos = R_res.dot(res2.positions)
+        res2.positions = new_pos
+        if self.orientation_up:
+            v_x = ((res2.positions[:,res2.atoms.index('CLP')] - res2.positions[:,res2.atoms.index('CA')]) / 2) - res2.positions[:,res2.atoms.index('NL')]
+        else:
+            v_x = res2.positions[:,res2.atoms.index('NL')] - ((res2.positions[:,res2.atoms.index('CLP')] - res2.positions[:,res2.atoms.index('CA')]) / 2)
+        v_x = v_x / np.linalg.norm(v_x)
+        R_x = vec_align(v_x, np.array([1, 0, 0]))
+        new_pos = R_x.dot(res2.positions)
+        res2.positions = new_pos
+
         self.align_nl(res1, res2)
+        res1.get_backbone_vectors(inplace=True)
         res2.get_backbone_vectors(inplace=True)
 
         res2_begin = res1.positions[:,res1.atoms.index('CLP')] - res1.backbone_vectors[1]
@@ -139,6 +252,7 @@ class Builder:
         repeat_count = 1
         res1 = self.chain[-1]
         res2 = res1.__copy__()
+        res2.name = 'PCH'
         res2.rotate(math.pi)
 
         if self.orientation_up:
@@ -202,11 +316,6 @@ class Builder:
         for res in chain1:
             res.translate(trltn)
 
-        # pep_start = chain1[-1].positions[:,0] + trans_v
-        # trltn = pep_start - chain2[0].positions[:,chain2[0].atoms.index('CA')]
-        # for res in chain2:
-        #     res.translate(trltn)
-
     def assemble(self, restype1, n1, restype2='STM', n2=0, chain_type='bilayer', n_cap_type='amine', c_cap_type='amine'):
         if restype1 not in self.res_types or restype2 not in self.res_types:
             print("Please select a valid residue (Builder.res_types)")
@@ -232,15 +341,41 @@ class Builder:
             chain1 = self.chain[n1:]
             chain2 = self.chain[:n1]
             self.chain_align(chain1, chain2)
-            self.chain[-1].make_ch3(c_cap_type)
+            self.chain[-1].make_carbon_cap(c_cap_type)
             self.chain[0].make_n_cap(n_cap_type)
-            for res in self.chain:
-                if res.name == 'PCH':
-                    res.name = 'PCT'
-                    break
             return 0
         self.chain[-1].make_c_cap(c_cap_type)
         self.chain[0].make_n_cap(n_cap_type)
+
+    def trans(self, trltn):
+        for res in self.chain:
+            res.translate(trltn)
+
+    def flip_x(self, angle):
+        rot_mat = np.zeros((3,3))
+        rot_mat[0,0] = 1
+        rot_mat[1,0] = 0
+        rot_mat[2,0] = 0
+        rot_mat[0,1] = 0
+        rot_mat[1,1] = math.cos(angle)
+        rot_mat[2,1] = -math.sin(angle)
+        rot_mat[0,2] = 0
+        rot_mat[1,2] = math.sin(angle)
+        rot_mat[2,2] = math.cos(angle)
+        for res in self.chain:
+            new_pos = rot_mat.dot(res.positions)
+            res.positions = new_pos
+
+    def flip_z(self, angle):
+        # Move to origin
+        origin_trltn = -self.chain[0].positions[:,0]
+        self.trans(origin_trltn)
+        axis = [0, 0, 1]
+        rot_mat = get_rot_mat(axis, angle)
+        for res in self.chain:
+            new_pos = rot_mat.dot(res.positions)
+            res.positions = new_pos
+        self.trans(-origin_trltn)
 
     def clear(self):
         self.chain = []
@@ -248,8 +383,9 @@ class Builder:
 
 class Residue:
     def __init__(self, name):
-        self.name = name.upper()
-        self.pdb_path = RES_LIB+"/"+name.upper()+".pdb"
+        self.name = name
+        self.file_name = self.name
+        self.pdb_path = RES_LIB+"/"+name+".pdb"
         self.atoms = self.get_atom_names()
         self.positions = self.get_atom_positions()
 
@@ -296,12 +432,19 @@ class Residue:
 class CarbonResidue(Residue):
     def __init__(self, name):
         Residue.__init__(self, name)
+        self.type = 'carbon'
         self.down_vec = np.array([-1, 0, 1])
         self.up_vec = np.array([1, 0, 1])
         self.up_status = True
 
     def __copy__(self):
-        new_res = CarbonResidue(self.name)
+        new_res = CarbonResidue('PCH')
+        if self.name[0] == 'C':
+            new_res.make_carbon_cap('methyl')
+        elif self.name[0] == 'N':
+            new_res.make_carbon_cap('amine')
+        elif self.name == 'PCT':
+            new_res.name = 'PCT'
         new_res.positions = self.positions
         new_res.up_status = self.up_status
         return new_res
@@ -321,7 +464,7 @@ class CarbonResidue(Residue):
         trltn = self.positions[:,0] - new_pos[:,0]
         self.translate(trltn, list(new_pos))
 
-    def make_ch3(self, c_cap_type):
+    def make_carbon_cap(self, c_cap_type):
         if c_cap_type == 'amine':
             self.atoms[0] = 'NT'
             self.atoms[1] = 'HN1'
@@ -340,21 +483,25 @@ class CarbonResidue(Residue):
             self.positions = new_pos
             self.name = 'CCH'
 
-
-
-
-
 class PeptoidResidue(Residue):
     def __init__(self, name):
         Residue.__init__(self, name)
+        if self.name[0] == 'B':
+            self.type = 'hydrophobic'
+        elif self.name[0] == 'C':
+            self.type = 'polar'
         self.backbone_atoms = ['CLP','NL','CA']
         self.backbone_idxs, self.backbone_vectors = self.get_backbone_vectors()
         self.move_ol()
 
     def __copy__(self):
-        new_res = PeptoidResidue(self.name)
-        new_res.positions = self.positions
+        new_res = PeptoidResidue(self.file_name)
         new_res.backbone_idxs, new_res.backbone_vectors = new_res.get_backbone_vectors()
+        if self.name[-2:] == 'NR':
+            new_res.make_n_cap('amine')
+        elif self.name[-2:] == 'CR':
+            new_res.make_c_cap('amine')
+        new_res.positions = self.positions
         return new_res
 
     def get_backbone_vectors(self, inplace=False):
