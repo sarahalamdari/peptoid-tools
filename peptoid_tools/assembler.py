@@ -134,7 +134,7 @@ class Packer:
             self.oligomers[-1].trans([d,0,0])
             self.backbone_align(self.oligomers[-2], self.oligomers[-1], dim_ignore=0)
 
-    def copy_in_dim(self, n_repeats, d, dim=1):
+    def y_gen(self, n_repeats, d=4.5, dim=1):
         bulk_oligomers = [self.oligomers]
         trltn = np.zeros((3))
         trltn[dim] = d
