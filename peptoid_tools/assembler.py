@@ -486,7 +486,7 @@ class CarbonResidue(Residue):
 class PeptoidResidue(Residue):
     def __init__(self, name):
         Residue.__init__(self, name)
-        if self.name[0] == 'B':
+        if self.name[0] == 'B': ### FUTURE POTENTIAL PROBLEM
             self.type = 'hydrophobic'
         elif self.name[0] == 'C':
             self.type = 'polar'
@@ -497,9 +497,11 @@ class PeptoidResidue(Residue):
     def __copy__(self):
         new_res = PeptoidResidue(self.file_name)
         new_res.backbone_idxs, new_res.backbone_vectors = new_res.get_backbone_vectors()
-        if self.name[-2:] == 'NR':
+        if self.name[-2:] == 'NR': ### I DON'T KNOW WHY I WROTE THIS
+            print("IT GOT CALLED")
             new_res.make_n_cap('amine')
         elif self.name[-2:] == 'CR':
+            print("IT GOT CALLED!")
             new_res.make_c_cap('amine')
         new_res.positions = self.positions
         return new_res
@@ -572,7 +574,7 @@ class PeptoidResidue(Residue):
                 new_pos[:,i] = pos
             new_pos[:,4:] = self.positions
             self.positions = new_pos
-            self.name = self.name[:-1]+'N'
+            self.name = self.name[:-1]+'N' ### POTENTIAL PROBLEM
 
         elif cap_type == 'amine':
             hn1_pos = self.positions[:,0]
@@ -590,7 +592,7 @@ class PeptoidResidue(Residue):
                     old_idx += 1
 
             self.positions = new_pos
-            self.name = self.name[0]+'CR'
+            self.name = self.name[0]+'CR' ### POTENTIAL PROBLEM
 
     def make_n_cap(self, cap_type):
         if cap_type == 'methyl':
@@ -611,7 +613,7 @@ class PeptoidResidue(Residue):
             new_pos[:,split_idx] = h_pos
             new_pos[:,split_idx+1:] = self.positions[:,split_idx:]
             self.positions = new_pos
-            self.name = self.name[:-1]+'C'
+            self.name = self.name[:-1]+'C' ### POTENTIAL PROBLEM
 
 
         elif cap_type == 'amine':
@@ -641,4 +643,4 @@ class PeptoidResidue(Residue):
                 new_pos_arr[:,idx] = pos
                 idx += 1
             self.positions = np.concatenate((self.positions, new_pos_arr),axis=1)
-            self.name = self.name[0]+'NR'
+            self.name = self.name[0]+'NR'  ### POTENTIAL PROBLEM
