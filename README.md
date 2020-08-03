@@ -1,3 +1,8 @@
+# to install 
+`git clone https://github.com/oriondollar/peptoid-tools.git`
+
+`pip install -e peptoid-tools`
+
 # peptoid-tools
 Python library for creating peptoid structures (bilayers, alternating polymers, carbon chains) in .pdb format and packing them (sheets, tubes)
 
@@ -16,7 +21,7 @@ Next we initialize a packer object that packs the peptoid into a sheet. The x_ge
 ```
 packer = assembler.Packer(builder)
 packer.x_gen(n_repeats=5, d=18, ring_type='perpendicular')
-packer.copy_in_dim(n_repeats=17, d=4.5)
+packer.y_gen(n_repeats=17, d=4.5)
 ```
 
 The last thing we do is create a writer object and send it the packer object which contains the fully formed sheet as well as the filename we want to write to.
