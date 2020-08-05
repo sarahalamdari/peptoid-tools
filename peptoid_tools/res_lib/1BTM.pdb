@@ -1,0 +1,22 @@
+CRYST1   40.000   40.000   40.000  90.00  90.00  90.00 P 1           1
+ATOM      1  CLP BTM X   2      29.001  27.981  31.346                       C
+ATOM      2  OL  BTM X   2      28.389  27.618  30.643                       O
+ATOM      3  NL  BTM X   2      28.240  28.286  32.477                       N
+ATOM      4  CA  BTM X   2      28.973  28.560  33.533                       C
+ATOM      5  HA1 BTM X   2      28.754  29.491  33.241                       H
+ATOM      6  HA2 BTM X   2      29.191  27.628  33.824                       H
+ATOM      7  CG  BTM X   2      27.023  27.439  32.707                       C
+ATOM      8  HG1 BTM X   2      27.307  26.586  32.095                       H
+ATOM      9  HG2 BTM X   2      27.376  27.289  33.727                       H
+ATOM     10  CD  BTM X   2      25.488  27.414  32.674                       C
+ATOM     11  CE1 BTM X   2      24.831  26.684  31.608                       C
+ATOM     12  HE1 BTM X   2      25.385  26.172  30.829                       H
+ATOM     13  CE2 BTM X   2      24.763  27.865  33.791                       C
+ATOM     14  HE2 BTM X   2      25.203  28.326  34.668                       H
+ATOM     15  CZ1 BTM X   2      23.444  26.516  31.598                       C
+ATOM     16  HZ1 BTM X   2      22.955  26.096  30.742                       H
+ATOM     17  CZ2 BTM X   2      23.358  27.812  33.671                       C
+ATOM     18  HZ2 BTM X   2      22.826  28.187  34.539                       H
+ATOM     19  CH  BTM X   2      22.690  27.181  32.615                       C
+ATOM     20  BRL BTM X   2      20.907  26.990  32.566                       B
+END
